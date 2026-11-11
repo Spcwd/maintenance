@@ -1,7 +1,10 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/maintenance_request.dart';
+import '../models/profile.dart';
 import '../services/request_repository.dart';
+import 'admin_page.dart';
 import 'login_page.dart';
 import 'receipt_page.dart';
 import 'request_form_page.dart';
@@ -10,8 +13,18 @@ const List<String> statuses = ['Pending', 'In Progress', 'Completed'];
 
 String formatDate(DateTime date) {
   const months = <String>[
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
   ];
   return '${months[date.month - 1]} ${date.day}, ${date.year}';
 }
@@ -47,7 +60,7 @@ Color statusColor(String status) {
     case 'In Progress':
       return const Color(0xFFF59E0B);
     case 'Completed':
-      return const Color(0xFF22C55E);
+      return const Color(0xFF087F75);
     default:
       return const Color(0xFF64748B);
   }
@@ -72,20 +85,26 @@ enum _Section { overview, requests, completed }
 
 class HomePage extends StatefulWidget {
   final String username;
-  const HomePage({super.key, required this.username});
+  final Profile? profile;
+  const HomePage({super.key, required this.username, this.profile});
 
   @override
   State<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
-  static const _primary = Color(0xFF2563EB);
-  static const _indigo = Color(0xFF4F46E5);
-  static const _navy = Color(0xFF0B1B4D);
-  static const _bg = Color(0xFFF4F6FB);
-  static const _ink = Color(0xFF0F172A);
-  static const _muted = Color(0xFF64748B);
-  static const _line = Color(0xFFE2E8F0);
+  // Same colors as the login page
+  static const _primary = Color(0xFF087F75); // login teal
+  static const _indigo = Color(0xFF14A89A); // lighter teal (gradients)
+  static const _navy = Color(0xFF173B46); // login dark panel (top)
+  static const _bgBottom = Color(0xFF102B38); // login dark panel (bottom)
+  static const _bg = Color(0xFFF3F7F5); // login canvas
+  static const _field = Color(0xFFF5F8F7); // login field fill
+  static const _mint = Color(0xFFB8F2D8); // login mint accent
+  static const _cardLine = Color(0xFFE8EFEB); // login card border
+  static const _ink = Color(0xFF172B3A);
+  static const _muted = Color(0xFF71818C);
+  static const _line = Color(0xFFE7EEEA);
 
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   final _searchCtrl = TextEditingController();
@@ -96,6 +115,7 @@ class _HomePageState extends State<HomePage> {
   String _filter = 'All';
   String _search = '';
   bool _loading = true;
+  bool _showAllTypes = false;
   String? _error;
 
   List<MaintenanceRequest> _requests = [];
@@ -181,11 +201,14 @@ class _HomePageState extends State<HomePage> {
 
   List<BoxShadow> get _shadow => [
         BoxShadow(
-          color: const Color(0xFF1E3A8A).withOpacity(0.07),
-          blurRadius: 24,
-          offset: const Offset(0, 10),
+          color: const Color(0xFF193C42).withOpacity(0.07),
+          blurRadius: 28,
+          offset: const Offset(0, 12),
         ),
       ];
+
+  /// True on phones (narrow screens).
+  bool get _small => MediaQuery.of(context).size.width < 480;
 
   String _greeting() {
     final h = DateTime.now().hour;
@@ -292,10 +315,23 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  void _logout() {
+  Future<void> _logout() async {
+    try {
+      await Supabase.instance.client.auth.signOut();
+    } catch (_) {}
+    if (!mounted) return;
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (_) => const LoginPage()),
+    );
+  }
+
+  void _openAdminSection() {
+    final profile = widget.profile;
+    if (profile == null || !profile.isAdmin) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => AdminHomePage(profile: profile)),
     );
   }
 
@@ -410,43 +446,57 @@ class _HomePageState extends State<HomePage> {
     required bool selected,
     required VoidCallback onTap,
     int? count,
+    bool danger = false,
   }) {
+    final fg = selected
+        ? Colors.white
+        : (danger ? const Color(0xFFFCA5A5) : Colors.white.withOpacity(0.68));
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: InkWell(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         onTap: onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
-            color: selected ? Colors.white.withOpacity(0.15) : Colors.transparent,
-            borderRadius: BorderRadius.circular(14),
+            color:
+                selected ? Colors.white.withOpacity(0.12) : Colors.transparent,
+            borderRadius: BorderRadius.circular(16),
+            border: selected
+                ? Border.all(color: Colors.white.withOpacity(0.10))
+                : null,
           ),
           child: Row(
             children: [
-              Icon(icon, size: 22, color: selected ? Colors.white : Colors.white70),
+              Icon(icon, size: 22, color: selected ? _mint : fg),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   label,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: selected ? Colors.white : Colors.white70,
-                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                    color: fg,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
                   ),
                 ),
               ),
               if (count != null)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(selected ? 0.25 : 0.1),
+                    color: selected
+                        ? _mint.withOpacity(0.20)
+                        : Colors.white.withOpacity(0.08),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
                     '$count',
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold, color: Colors.white),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: selected ? _mint : Colors.white70,
+                    ),
                   ),
                 ),
             ],
@@ -464,114 +514,228 @@ class _HomePageState extends State<HomePage> {
 
     final initial =
         widget.username.isEmpty ? '?' : widget.username[0].toUpperCase();
+    final screenW = MediaQuery.of(context).size.width;
+    final radius = drawer
+        ? const BorderRadius.horizontal(right: Radius.circular(28))
+        : BorderRadius.circular(28);
 
+    // Same dark teal panel look as the login page's left side.
     return Container(
-      width: drawer ? null : 264,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [_navy, Color(0xFF1E3A8A)],
-        ),
+      width: drawer ? null : (screenW >= 1200 ? 264.0 : 232.0),
+      margin: drawer ? EdgeInsets.zero : const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: radius,
+        boxShadow: drawer
+            ? null
+            : [
+                BoxShadow(
+                  color: const Color(0xFF193C42).withOpacity(0.18),
+                  blurRadius: 40,
+                  offset: const Offset(0, 18),
+                ),
+              ],
       ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: const Icon(Icons.handyman_rounded, color: Colors.white),
-                  ),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Text(
-                      'Maintenance',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 32),
-              Expanded(
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _navItem(
-                        Icons.dashboard_rounded,
-                        'Dashboard',
-                        selected: _section == _Section.overview,
-                        onTap: () => go(() => _setSection(_Section.overview)),
-                      ),
-                      _navItem(
-                        Icons.list_alt_rounded,
-                        'Requests',
-                        selected: _section == _Section.requests,
-                        onTap: () => go(() => _setSection(_Section.requests)),
-                        count: _openCount,
-                      ),
-                      _navItem(
-                        Icons.check_circle_rounded,
-                        'Completed',
-                        selected: _section == _Section.completed,
-                        onTap: () => go(() => _setSection(_Section.completed)),
-                        count: _count('Completed'),
-                      ),
-                    ],
+      child: ClipRRect(
+        borderRadius: radius,
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [_navy, _bgBottom],
                   ),
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.all(12),
+            ),
+            Positioned(
+              right: -90,
+              top: -80,
+              child: Container(
+                width: 260,
+                height: 260,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.08),
-                  borderRadius: BorderRadius.circular(16),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.06),
+                    width: 1,
+                  ),
                 ),
-                child: Row(
+              ),
+            ),
+            Positioned(
+              right: -50,
+              top: -40,
+              child: Container(
+                width: 170,
+                height: 170,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: _mint.withOpacity(0.07),
+                ),
+              ),
+            ),
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(18, 26, 18, 18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    CircleAvatar(
-                      radius: 18,
-                      backgroundColor: Colors.white,
-                      child: Text(
-                        initial,
-                        style: const TextStyle(
-                          color: _primary,
-                          fontWeight: FontWeight.w800,
+                    Row(
+                      children: [
+                        Container(
+                          width: 46,
+                          height: 46,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          child: const Icon(Icons.handyman_rounded,
+                              color: _mint, size: 24),
                         ),
-                      ),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Text(
+                            'MAINTENANCE',
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 1.7,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
+                    const SizedBox(height: 34),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 6, bottom: 10),
                       child: Text(
-                        widget.username.isEmpty ? 'User' : widget.username,
-                        style: const TextStyle(
-                          color: Colors.white,
+                        'MENU',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.45),
+                          fontSize: 10,
+                          letterSpacing: 1.4,
                           fontWeight: FontWeight.w700,
                         ),
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _navItem(
+                              Icons.dashboard_rounded,
+                              'Dashboard',
+                              selected: _section == _Section.overview,
+                              onTap: () =>
+                                  go(() => _setSection(_Section.overview)),
+                            ),
+                            _navItem(
+                              Icons.list_alt_rounded,
+                              'Requests',
+                              selected: _section == _Section.requests,
+                              onTap: () =>
+                                  go(() => _setSection(_Section.requests)),
+                              count: _openCount,
+                            ),
+                            _navItem(
+                              Icons.check_circle_rounded,
+                              'Completed',
+                              selected: _section == _Section.completed,
+                              onTap: () =>
+                                  go(() => _setSection(_Section.completed)),
+                              count: _count('Completed'),
+                            ),
+                            if (widget.profile?.isAdmin == true) ...[
+                              const Padding(
+                                padding: EdgeInsets.fromLTRB(6, 18, 6, 10),
+                                child: Text(
+                                  'ADMIN',
+                                  style: TextStyle(
+                                    color: Colors.white54,
+                                    fontSize: 10,
+                                    letterSpacing: 1.4,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                              _navItem(
+                                Icons.admin_panel_settings_rounded,
+                                'Admin section',
+                                selected: false,
+                                onTap: () => go(_openAdminSection),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.10),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 18,
+                            backgroundColor: _mint,
+                            child: Text(
+                              initial,
+                              style: const TextStyle(
+                                color: _ink,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  widget.username.isEmpty
+                                      ? 'User'
+                                      : widget.username,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                Text(
+                                  'Signed in',
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.55),
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    _navItem(Icons.logout_rounded, 'Log out',
+                        selected: false,
+                        danger: true,
+                        onTap: () => go(_logout)),
                   ],
                 ),
               ),
-              const SizedBox(height: 10),
-              _navItem(Icons.logout_rounded, 'Log out',
-                  selected: false, onTap: () => go(_logout)),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -591,10 +755,12 @@ class _HomePageState extends State<HomePage> {
           Expanded(
             child: Text(
               _sectionTitle,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 color: _ink,
                 fontSize: 18,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.3,
               ),
             ),
           ),
@@ -621,26 +787,140 @@ class _HomePageState extends State<HomePage> {
 
   // --------------------------------------------------------------- Dashboard
 
+  static const _weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+  int _pct(int v) =>
+      _requests.isEmpty ? 0 : (v * 100 / _requests.length).round();
+
+  void _goRequests([String filter = 'All']) {
+    _setSection(_Section.requests);
+    setState(() => _filter = filter);
+  }
+
+  Widget _heroPill(String label, int value, IconData icon, Color color) {
+    final tint = Color.lerp(color, Colors.white, 0.55) ?? color;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.10)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 18, color: tint),
+          const SizedBox(width: 8),
+          Text(
+            '$value',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.72),
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Blue gradient panel (same look as the login page's sliding panel).
+
   Widget _banner(bool wide) {
+    final now = DateTime.now();
+    final dateText = '${_weekdays[now.weekday - 1]}, ${formatDate(now)}';
     final pending = _count('Pending');
     final active = _count('In Progress');
+    final done = _count('Completed');
     final message = (pending + active) == 0
         ? 'No open requests. You are all caught up.'
         : 'You have $pending pending and $active in-progress requests.';
+    final name = widget.username.isEmpty ? '' : ', ${widget.username}';
 
     final newBtn = FilledButton.icon(
       style: FilledButton.styleFrom(
-        backgroundColor: Colors.white,
-        foregroundColor: _primary,
-        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: _mint,
+        foregroundColor: _ink,
+        elevation: 0,
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
       onPressed: () => _openForm(),
       icon: const Icon(Icons.add_rounded),
       label: const Text(
         'New Request',
-        style: TextStyle(fontWeight: FontWeight.bold),
+        style: TextStyle(fontWeight: FontWeight.w700),
       ),
+    );
+
+    final info = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.10),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.calendar_today_rounded, size: 14, color: _mint),
+              const SizedBox(width: 8),
+              Text(
+                dateText,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          '${_greeting()}$name',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: wide ? 32 : 26,
+            fontWeight: FontWeight.w700,
+            height: 1.16,
+            letterSpacing: -0.9,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          message,
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.72),
+            height: 1.5,
+          ),
+        ),
+        const SizedBox(height: 22),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            _heroPill('Pending', pending, Icons.pending_actions_rounded,
+                statusColor('Pending')),
+            _heroPill('In Progress', active, Icons.hourglass_top_rounded,
+                statusColor('In Progress')),
+            _heroPill('Completed', done, Icons.check_circle_rounded,
+                statusColor('Completed')),
+          ],
+        ),
+      ],
     );
 
     return Container(
@@ -648,9 +928,9 @@ class _HomePageState extends State<HomePage> {
         borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-            color: _primary.withOpacity(0.3),
-            blurRadius: 30,
-            offset: const Offset(0, 14),
+            color: const Color(0xFF193C42).withOpacity(0.18),
+            blurRadius: 40,
+            offset: const Offset(0, 18),
           ),
         ],
       ),
@@ -661,52 +941,57 @@ class _HomePageState extends State<HomePage> {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [_primary, _indigo],
+              colors: [_navy, _bgBottom],
             ),
           ),
           child: Stack(
             children: [
-              Positioned(right: -50, top: -60, child: _circle(220, 0.10)),
-              Positioned(right: 140, bottom: -90, child: _circle(180, 0.07)),
+              Positioned(
+                right: -100,
+                top: -90,
+                child: Container(
+                  width: 300,
+                  height: 300,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.06),
+                      width: 1,
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                right: -55,
+                top: -45,
+                child: Container(
+                  width: 210,
+                  height: 210,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _mint.withOpacity(0.07),
+                  ),
+                ),
+              ),
               Padding(
-                padding: EdgeInsets.all(wide ? 32 : 22),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                padding: EdgeInsets.all(wide ? 34 : 24),
+                child: wide
+                    ? Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          const Text(
-                            'Welcome back',
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 0.3,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            _greeting(),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 26,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          Text(
-                            message,
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              height: 1.4,
-                            ),
-                          ),
+                          Expanded(child: info),
+                          const SizedBox(width: 20),
+                          newBtn,
+                        ],
+                      )
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          info,
+                          const SizedBox(height: 20),
+                          newBtn,
                         ],
                       ),
-                    ),
-                    if (wide) newBtn,
-                  ],
-                ),
               ),
             ],
           ),
@@ -715,15 +1000,180 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _statCard(String label, int value, IconData icon, Color color,
-      {double? fraction}) {
+  Widget _statCard(
+    String label,
+    int value,
+    IconData icon,
+    Color color, {
+    required String footer,
+    VoidCallback? onTap,
+  }) {
+    final light = Color.lerp(color, Colors.white, 0.3) ?? color;
+    return _HoverCard(
+      onTap: onTap ?? () {},
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [color, light],
+                    ),
+                    borderRadius: BorderRadius.circular(15),
+                    boxShadow: [
+                      BoxShadow(
+                        color: color.withOpacity(0.35),
+                        blurRadius: 14,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: Icon(icon, color: Colors.white),
+                ),
+                const Spacer(),
+                const Icon(Icons.arrow_forward_rounded,
+                    size: 18, color: _muted),
+              ],
+            ),
+            const SizedBox(height: 18),
+            TweenAnimationBuilder<double>(
+              tween: Tween<double>(begin: 0, end: value.toDouble()),
+              duration: const Duration(milliseconds: 700),
+              curve: Curves.easeOutCubic,
+              builder: (_, v, __) => Text(
+                '${v.round()}',
+                style: const TextStyle(
+                  fontSize: 36,
+                  fontWeight: FontWeight.w800,
+                  color: _ink,
+                  height: 1,
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              style: const TextStyle(
+                color: _muted,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.10),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                footer,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _statsGrid(double w) {
     final total = _requests.length;
-    final frac = fraction ?? (total == 0 ? 0.0 : value / total);
+    final pending = _count('Pending');
+    final active = _count('In Progress');
+    final done = _count('Completed');
+
+    final cards = <Widget>[
+      _statCard('Total requests', total, Icons.assignment_rounded, _primary,
+          footer: '$_openCount open', onTap: () => _goRequests()),
+      _statCard('Pending', pending, Icons.pending_actions_rounded,
+          statusColor('Pending'),
+          footer: '${_pct(pending)}% of total',
+          onTap: () => _goRequests('Pending')),
+      _statCard('In Progress', active, Icons.hourglass_top_rounded,
+          statusColor('In Progress'),
+          footer: '${_pct(active)}% of total',
+          onTap: () => _goRequests('In Progress')),
+      _statCard('Completed', done, Icons.check_circle_rounded,
+          statusColor('Completed'),
+          footer: '${_pct(done)}% of total',
+          onTap: () => _setSection(_Section.completed)),
+    ];
+
+    // Large screens: 4 across.
+    if (w >= 760) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (var i = 0; i < cards.length; i++) ...[
+            if (i > 0) const SizedBox(width: 20),
+            Expanded(child: cards[i]),
+          ],
+        ],
+      );
+    }
+    // Tablets and phones: 2 x 2.
+    if (w >= 300) {
+      return Column(
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: cards[0]),
+              const SizedBox(width: 14),
+              Expanded(child: cards[1]),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: cards[2]),
+              const SizedBox(width: 14),
+              Expanded(child: cards[3]),
+            ],
+          ),
+        ],
+      );
+    }
+    // Very small screens: one per row.
+    return Column(
+      children: [
+        for (var i = 0; i < cards.length; i++) ...[
+          if (i > 0) const SizedBox(height: 12),
+          cards[i],
+        ],
+      ],
+    );
+  }
+
+  Widget _panel({
+    required IconData icon,
+    required String title,
+    String? subtitle,
+    Widget? trailing,
+    required Widget child,
+  }) {
+    final pad = _small ? 18.0 : 24.0;
     return Container(
-      padding: const EdgeInsets.all(18),
+      width: double.infinity,
+      padding: EdgeInsets.all(pad),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: _cardLine),
         boxShadow: _shadow,
       ),
       child: Column(
@@ -732,128 +1182,40 @@ class _HomePageState extends State<HomePage> {
           Row(
             children: [
               Container(
-                width: 46,
-                height: 46,
+                width: 40,
+                height: 40,
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(14),
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [_primary, _indigo],
+                  ),
+                  borderRadius: BorderRadius.circular(13),
                 ),
-                child: Icon(icon, color: color),
+                child: Icon(icon, color: Colors.white, size: 20),
               ),
-              const Spacer(),
-              Text(
-                '$value',
-                style: const TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w800,
-                  color: _ink,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Text(
-            label,
-            style: const TextStyle(
-              color: _muted,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 10),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: TweenAnimationBuilder<double>(
-              tween: Tween<double>(begin: 0, end: frac),
-              duration: const Duration(milliseconds: 700),
-              curve: Curves.easeOutCubic,
-              builder: (_, v, __) => LinearProgressIndicator(
-                value: v,
-                minHeight: 6,
-                backgroundColor: color.withOpacity(0.12),
-                valueColor: AlwaysStoppedAnimation<Color>(color),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _statsGrid(double w) {
-    final total = _requests.length;
-    final cards = <Widget>[
-      _statCard('Total requests', total, Icons.assignment_rounded, _primary,
-          fraction: total == 0 ? 0.0 : 1.0),
-      _statCard('Pending', _count('Pending'), Icons.pending_actions_rounded,
-          statusColor('Pending')),
-      _statCard('In Progress', _count('In Progress'),
-          Icons.hourglass_top_rounded, statusColor('In Progress')),
-      _statCard('Completed', _count('Completed'), Icons.check_circle_rounded,
-          statusColor('Completed')),
-    ];
-
-    if (w >= 760) {
-      return Row(
-        children: [
-          for (var i = 0; i < cards.length; i++) ...[
-            if (i > 0) const SizedBox(width: 16),
-            Expanded(child: cards[i]),
-          ],
-        ],
-      );
-    }
-    return Column(
-      children: [
-        Row(children: [
-          Expanded(child: cards[0]),
-          const SizedBox(width: 12),
-          Expanded(child: cards[1]),
-        ]),
-        const SizedBox(height: 12),
-        Row(children: [
-          Expanded(child: cards[2]),
-          const SizedBox(width: 12),
-          Expanded(child: cards[3]),
-        ]),
-      ],
-    );
-  }
-
-  Widget _panel({
-    required String title,
-    String? subtitle,
-    Widget? trailing,
-    required Widget child,
-  }) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: _shadow,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       title,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: 17,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                         color: _ink,
+                        letterSpacing: -0.3,
                       ),
                     ),
                     if (subtitle != null) ...[
                       const SizedBox(height: 2),
-                      Text(subtitle,
-                          style: const TextStyle(color: _muted, fontSize: 12.5)),
+                      Text(
+                        subtitle,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: _muted, fontSize: 12.5),
+                      ),
                     ],
                   ],
                 ),
@@ -861,12 +1223,28 @@ class _HomePageState extends State<HomePage> {
               if (trailing != null) trailing,
             ],
           ),
-          const SizedBox(height: 18),
+          SizedBox(height: _small ? 18 : 22),
           child,
         ],
       ),
     );
   }
+
+  Widget _chip(String text, Color color) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.10),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          text,
+          style: TextStyle(
+            color: color,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      );
 
   Widget _legendRow(String label, int value, Color color) {
     return Padding(
@@ -876,7 +1254,10 @@ class _HomePageState extends State<HomePage> {
           Container(
             width: 10,
             height: 10,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(3),
+            ),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -887,101 +1268,158 @@ class _HomePageState extends State<HomePage> {
           Text('$value',
               style: const TextStyle(
                   color: _ink, fontWeight: FontWeight.w800, fontSize: 16)),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 40,
+            child: Text(
+              '${_pct(value)}%',
+              textAlign: TextAlign.right,
+              style: const TextStyle(color: _muted, fontSize: 12.5),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _statusPanel() {
+  Widget _statusPanel(double inner) {
     final pending = _count('Pending');
     final active = _count('In Progress');
     final done = _count('Completed');
-    final total = _requests.length;
-    final rate = total == 0 ? 0 : (done * 100 / total).round();
+    final rate = _pct(done);
+    final compact = inner < 400;
+
+    final donut = SizedBox(
+      width: 150,
+      height: 150,
+      child: TweenAnimationBuilder<double>(
+        tween: Tween<double>(begin: 0, end: 1),
+        duration: const Duration(milliseconds: 900),
+        curve: Curves.easeOutCubic,
+        builder: (_, t, __) => CustomPaint(
+          painter: _DonutPainter(
+            values: [
+              pending.toDouble(),
+              active.toDouble(),
+              done.toDouble(),
+            ],
+            colors: [
+              statusColor('Pending'),
+              statusColor('In Progress'),
+              statusColor('Completed'),
+            ],
+            track: _field,
+            progress: t,
+            stroke: 20,
+          ),
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '$rate%',
+                  style: const TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w800,
+                    color: _primary,
+                  ),
+                ),
+                const Text(
+                  'completed',
+                  style: TextStyle(color: _muted, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final legend = Column(
+      children: [
+        _legendRow('Pending', pending, statusColor('Pending')),
+        _legendRow('In Progress', active, statusColor('In Progress')),
+        _legendRow('Completed', done, statusColor('Completed')),
+      ],
+    );
 
     return _panel(
+      icon: Icons.donut_large_rounded,
       title: 'Status overview',
       subtitle: 'How your requests are progressing',
       child: Column(
         children: [
+          if (compact)
+            Column(
+              children: [
+                Center(child: donut),
+                const SizedBox(height: 16),
+                SizedBox(width: double.infinity, child: legend),
+              ],
+            )
+          else
+            Row(
+              children: [
+                donut,
+                const SizedBox(width: 20),
+                Expanded(child: legend),
+              ],
+            ),
+          const Divider(height: 28, color: _line),
           Row(
             children: [
-              SizedBox(
-                width: 150,
-                height: 150,
-                child: TweenAnimationBuilder<double>(
-                  tween: Tween<double>(begin: 0, end: 1),
-                  duration: const Duration(milliseconds: 900),
-                  curve: Curves.easeOutCubic,
-                  builder: (_, t, __) => CustomPaint(
-                    painter: _DonutPainter(
-                      values: [
-                        pending.toDouble(),
-                        active.toDouble(),
-                        done.toDouble(),
-                      ],
-                      colors: [
-                        statusColor('Pending'),
-                        statusColor('In Progress'),
-                        statusColor('Completed'),
-                      ],
-                      track: const Color(0xFFEFF3F8),
-                      progress: t,
-                    ),
-                    child: Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            '$rate%',
-                            style: const TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w800,
-                              color: _ink,
-                            ),
-                          ),
-                          const Text(
-                            'completed',
-                            style: TextStyle(color: _muted, fontSize: 12),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: _field,
+                  borderRadius: BorderRadius.circular(11),
                 ),
+                child:
+                    const Icon(Icons.timer_outlined, size: 19, color: _primary),
               ),
-              const SizedBox(width: 20),
-              Expanded(
-                child: Column(
-                  children: [
-                    _legendRow('Pending', pending, statusColor('Pending')),
-                    _legendRow(
-                        'In Progress', active, statusColor('In Progress')),
-                    _legendRow('Completed', done, statusColor('Completed')),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          const Divider(height: 24, color: _line),
-          Row(
-            children: [
-              const Icon(Icons.timer_outlined, size: 20, color: _muted),
-              const SizedBox(width: 10),
+              const SizedBox(width: 12),
               const Expanded(
                 child: Text('Average turnaround',
-                    style: TextStyle(
-                        color: _muted, fontWeight: FontWeight.w600)),
+                    style:
+                        TextStyle(color: _muted, fontWeight: FontWeight.w600)),
               ),
               Text(
                 _avgTurnaround(),
                 style: const TextStyle(
-                    color: _ink, fontWeight: FontWeight.w800, fontSize: 16),
+                    color: _ink, fontWeight: FontWeight.w800, fontSize: 17),
               ),
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  /// Rounded horizontal progress bar with a gradient fill.
+  Widget _bar(double frac, List<Color> colors) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        height: 10,
+        color: const Color(0xFFEFF3F8),
+        child: TweenAnimationBuilder<double>(
+          tween: Tween<double>(begin: 0, end: frac),
+          duration: const Duration(milliseconds: 700),
+          curve: Curves.easeOutCubic,
+          builder: (_, v, __) => Align(
+            alignment: Alignment.centerLeft,
+            child: FractionallySizedBox(
+              widthFactor: v.clamp(0.0, 1.0),
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(colors: colors),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -992,20 +1430,21 @@ class _HomePageState extends State<HomePage> {
     required int value,
     required int max,
     required Color color,
+    List<Color>? gradient,
   }) {
     final frac = max == 0 ? 0.0 : value / max;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.only(bottom: 16),
       child: Row(
         children: [
           Container(
-            width: 36,
-            height: 36,
+            width: 38,
+            height: 38,
             decoration: BoxDecoration(
               color: color.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(11),
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, size: 18, color: color),
+            child: Icon(icon, size: 19, color: color),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -1025,25 +1464,13 @@ class _HomePageState extends State<HomePage> {
                       ),
                     ),
                     Text('$value',
-                        style: const TextStyle(
-                            color: _ink, fontWeight: FontWeight.w800)),
+                        style: TextStyle(
+                            color: value == 0 ? _muted : _ink,
+                            fontWeight: FontWeight.w800)),
                   ],
                 ),
-                const SizedBox(height: 7),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: TweenAnimationBuilder<double>(
-                    tween: Tween<double>(begin: 0, end: frac),
-                    duration: const Duration(milliseconds: 700),
-                    curve: Curves.easeOutCubic,
-                    builder: (_, v, __) => LinearProgressIndicator(
-                      value: v,
-                      minHeight: 7,
-                      backgroundColor: color.withOpacity(0.12),
-                      valueColor: AlwaysStoppedAnimation<Color>(color),
-                    ),
-                  ),
-                ),
+                const SizedBox(height: 8),
+                _bar(frac, gradient ?? [color, color.withOpacity(0.65)]),
               ],
             ),
           ),
@@ -1052,24 +1479,161 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _typePanel() {
-    int countType(String t) => _requests.where((r) => r.type == t).length;
-    final max = requestTypes
-        .map(countType)
-        .fold<int>(0, (a, b) => a > b ? a : b);
+  Widget _weekBar({
+    required String label,
+    required int count,
+    required int max,
+    required bool today,
+  }) {
+    final frac = count == 0 ? 0.04 : count / max;
+    final radius = BorderRadius.circular(9);
+    final decoration = (today && count > 0)
+        ? BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [_primary, _indigo],
+            ),
+            borderRadius: radius,
+          )
+        : BoxDecoration(
+            color: count > 0 ? _primary.withOpacity(0.28) : _line,
+            borderRadius: radius,
+          );
+
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        SizedBox(
+          height: 18,
+          child: Text(
+            count > 0 ? '$count' : '',
+            style: const TextStyle(
+                color: _ink, fontWeight: FontWeight.w800, fontSize: 12.5),
+          ),
+        ),
+        const SizedBox(height: 4),
+        TweenAnimationBuilder<double>(
+          tween: Tween<double>(begin: 0, end: frac),
+          duration: const Duration(milliseconds: 700),
+          curve: Curves.easeOutCubic,
+          builder: (_, v, __) => Container(
+            width: 26,
+            height: (96 * v) < 4 ? 4 : 96 * v,
+            decoration: decoration,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          label,
+          style: TextStyle(
+            color: today ? _primary : _muted,
+            fontWeight: today ? FontWeight.w800 : FontWeight.w600,
+            fontSize: 12,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _weekPanel() {
+    final now = DateTime.now();
+    final days = List<DateTime>.generate(
+      7,
+      (i) => DateTime(now.year, now.month, now.day - (6 - i)),
+    );
+    final counts = days
+        .map((d) => _requests
+            .where((r) =>
+                r.date.year == d.year &&
+                r.date.month == d.month &&
+                r.date.day == d.day)
+            .length)
+        .toList();
+    final max = counts.fold<int>(1, (a, b) => a > b ? a : b);
+    final total = counts.fold<int>(0, (a, b) => a + b);
 
     return _panel(
+      icon: Icons.bar_chart_rounded,
+      title: 'Weekly activity',
+      subtitle: 'Requests filed in the last 7 days',
+      trailing: _chip('$total this week', _primary),
+      child: SizedBox(
+        height: 170,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            for (var i = 0; i < days.length; i++)
+              Expanded(
+                child: _weekBar(
+                  label: _weekdays[days[i].weekday - 1],
+                  count: counts[i],
+                  max: max,
+                  today: i == days.length - 1,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _typePanel() {
+    final counts = <String, int>{};
+    final labels = <String, String>{};
+    for (final request in _requests) {
+      final label = request.type.trim();
+      if (label.isEmpty) continue;
+      final key = label.toLowerCase();
+      labels.putIfAbsent(key, () => label);
+      counts.update(key, (count) => count + 1, ifAbsent: () => 1);
+    }
+    final types = counts.entries.toList()
+      ..sort((a, b) {
+        final byCount = b.value.compareTo(a.value);
+        if (byCount != 0) return byCount;
+        return labels[a.key]!.toLowerCase().compareTo(
+              labels[b.key]!.toLowerCase(),
+            );
+      });
+    const visibleLimit = 5;
+    final shownTypes =
+        _showAllTypes ? types : types.take(visibleLimit).toList();
+    final max = types.isEmpty
+        ? 0
+        : types.map((type) => type.value).reduce((a, b) => a > b ? a : b);
+
+    return _panel(
+      icon: Icons.category_rounded,
       title: 'Requests by type',
       subtitle: 'All requests',
       child: Column(
         children: [
-          for (final t in requestTypes)
-            _barRow(
-              icon: typeIcon(t),
-              label: t,
-              value: countType(t),
-              max: max,
-              color: _primary,
+          if (shownTypes.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Text(
+                'Request types will appear here when entered.',
+                style: TextStyle(color: _muted),
+              ),
+            )
+          else
+            for (final type in shownTypes)
+              _barRow(
+                icon: typeIcon(labels[type.key]!),
+                label: labels[type.key]!,
+                value: type.value,
+                max: max,
+                color: _primary,
+                gradient: const [_primary, _indigo],
+              ),
+          if (types.length > visibleLimit)
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: () => setState(() => _showAllTypes = !_showAllTypes),
+                child: Text(_showAllTypes ? 'Show less' : 'See all'),
+              ),
             ),
         ],
       ),
@@ -1081,8 +1645,12 @@ class _HomePageState extends State<HomePage> {
     int countP(String p) => open.where((r) => r.priority == p).length;
     final order = priorities.reversed.toList(); // Urgent first
     final max = order.map(countP).fold<int>(0, (a, b) => a > b ? a : b);
+    final hot = countP('Urgent') + countP('High');
+    final alertColor =
+        hot > 0 ? const Color(0xFFEF4444) : statusColor('Completed');
 
     return _panel(
+      icon: Icons.flag_rounded,
       title: 'Open by priority',
       subtitle: 'Pending and in-progress only',
       child: Column(
@@ -1095,6 +1663,43 @@ class _HomePageState extends State<HomePage> {
               max: max,
               color: priorityColor(p),
             ),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: alertColor.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: alertColor.withOpacity(0.25)),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  hot > 0
+                      ? Icons.warning_amber_rounded
+                      : Icons.verified_rounded,
+                  color: alertColor,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    hot > 0
+                        ? '$hot urgent or high request${hot == 1 ? '' : 's'} need attention'
+                        : 'No urgent requests. Great work!',
+                    style: TextStyle(
+                      color: alertColor,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+                if (hot > 0)
+                  TextButton(
+                    onPressed: () => _goRequests(),
+                    child: const Text('Review'),
+                  ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -1105,23 +1710,23 @@ class _HomePageState extends State<HomePage> {
       borderRadius: BorderRadius.circular(14),
       onTap: () => _showDetails(r),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10),
+        padding: const EdgeInsets.symmetric(vertical: 12),
         child: Row(
           children: [
             Container(
-              width: 42,
-              height: 42,
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [_primary, _indigo],
                 ),
-                borderRadius: BorderRadius.circular(13),
+                borderRadius: BorderRadius.circular(14),
               ),
-              child: Icon(typeIcon(r.type), color: Colors.white, size: 20),
+              child: Icon(typeIcon(r.type), color: Colors.white, size: 21),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1135,7 +1740,7 @@ class _HomePageState extends State<HomePage> {
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 3),
                   Text(
                     '${r.id}  -  ${formatDateTime(r.date)}',
                     maxLines: 1,
@@ -1147,6 +1752,8 @@ class _HomePageState extends State<HomePage> {
             ),
             const SizedBox(width: 8),
             _badge(r.status, statusColor(r.status), dot: true),
+            const SizedBox(width: 4),
+            const Icon(Icons.chevron_right_rounded, color: _muted),
           ],
         ),
       ),
@@ -1156,10 +1763,12 @@ class _HomePageState extends State<HomePage> {
   Widget _recentPanel() {
     final recent = _requests.take(5).toList();
     return _panel(
+      icon: Icons.history_rounded,
       title: 'Recent requests',
       subtitle: 'Latest activity',
       trailing: TextButton(
-        onPressed: () => _setSection(_Section.requests),
+        style: TextButton.styleFrom(foregroundColor: _primary),
+        onPressed: () => _goRequests(),
         child: const Text('View all'),
       ),
       child: recent.isEmpty
@@ -1184,49 +1793,44 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  /// Two panels side by side with the SAME height (stacked on narrow screens).
+  Widget _pairRow(bool twoCol, Widget a, Widget b) {
+    if (!twoCol) {
+      return Column(children: [a, const SizedBox(height: 20), b]);
+    }
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(child: a),
+          const SizedBox(width: 20),
+          Expanded(child: b),
+        ],
+      ),
+    );
+  }
+
   Widget _overviewPage(double w) {
     final twoCol = w >= 860;
+    final panelW = twoCol ? (w - 20) / 2 : w;
+    final inner = panelW - (_small ? 36 : 48);
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _banner(w >= 700),
-        const SizedBox(height: 22),
+        _banner(w >= 720),
+        const SizedBox(height: 24),
         if (_loading)
           _loadingBox()
         else if (_error != null)
           _errorBox()
         else ...[
           _statsGrid(w),
-          const SizedBox(height: 22),
-          if (twoCol)
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(child: _statusPanel()),
-                const SizedBox(width: 20),
-                Expanded(child: _typePanel()),
-              ],
-            )
-          else ...[
-            _statusPanel(),
-            const SizedBox(height: 20),
-            _typePanel(),
-          ],
-          const SizedBox(height: 22),
-          if (twoCol)
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(flex: 3, child: _recentPanel()),
-                const SizedBox(width: 20),
-                Expanded(flex: 2, child: _priorityPanel()),
-              ],
-            )
-          else ...[
-            _recentPanel(),
-            const SizedBox(height: 20),
-            _priorityPanel(),
-          ],
+          const SizedBox(height: 24),
+          _pairRow(twoCol, _statusPanel(inner), _weekPanel()),
+          const SizedBox(height: 20),
+          _pairRow(twoCol, _typePanel(), _priorityPanel()),
+          const SizedBox(height: 20),
+          _recentPanel(),
         ],
       ],
     );
@@ -1244,10 +1848,11 @@ class _HomePageState extends State<HomePage> {
             children: [
               Text(
                 title,
-                style: const TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w800,
+                style: TextStyle(
+                  fontSize: _small ? 24 : 28,
+                  fontWeight: FontWeight.w700,
                   color: _ink,
+                  letterSpacing: -0.8,
                 ),
               ),
               const SizedBox(height: 4),
@@ -1259,14 +1864,16 @@ class _HomePageState extends State<HomePage> {
           FilledButton.icon(
             style: FilledButton.styleFrom(
               backgroundColor: _primary,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14)),
             ),
             onPressed: () => _openForm(),
             icon: const Icon(Icons.add_rounded),
             label: const Text('New Request',
-                style: TextStyle(fontWeight: FontWeight.bold)),
+                style: TextStyle(fontWeight: FontWeight.w700)),
           ),
       ],
     );
@@ -1276,20 +1883,22 @@ class _HomePageState extends State<HomePage> {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(30),
-        boxShadow: _shadow,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _line),
       ),
       child: TextField(
         controller: _searchCtrl,
         onChanged: (v) => setState(() => _search = v),
         decoration: InputDecoration(
           hintText: 'Search by subject, location, name or ID',
-          hintStyle: const TextStyle(color: _muted),
-          prefixIcon: const Icon(Icons.search_rounded, color: _muted),
+          hintStyle: const TextStyle(color: Color(0xFF9AA7AE), fontSize: 14),
+          prefixIcon: const Icon(Icons.search_rounded,
+              color: Color(0xFF82939B), size: 22),
           suffixIcon: _search.isEmpty
               ? null
               : IconButton(
-                  icon: const Icon(Icons.close_rounded, color: _muted),
+                  icon:
+                      const Icon(Icons.close_rounded, color: Color(0xFF82939B)),
                   onPressed: () {
                     _searchCtrl.clear();
                     setState(() => _search = '');
@@ -1332,9 +1941,7 @@ class _HomePageState extends State<HomePage> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
-                  color: selected
-                      ? Colors.white.withOpacity(0.25)
-                      : const Color(0xFFF1F5F9),
+                  color: selected ? Colors.white.withOpacity(0.25) : _field,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
@@ -1354,10 +1961,13 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _requestCard(MaintenanceRequest r) {
+    final compact = MediaQuery.of(context).size.width < 600;
+    final badge = _badge(r.status, statusColor(r.status), dot: true);
+
     return _HoverCard(
       onTap: () => _showDetails(r),
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(compact ? 16 : 20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
@@ -1393,6 +2003,8 @@ class _HomePageState extends State<HomePage> {
                       const SizedBox(height: 4),
                       Text(
                         formatDateTime(r.date),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           color: _muted,
                           fontWeight: FontWeight.w500,
@@ -1402,7 +2014,7 @@ class _HomePageState extends State<HomePage> {
                     ],
                   ),
                 ),
-                _badge(r.status, statusColor(r.status), dot: true),
+                if (!compact) badge,
                 IconButton(
                   tooltip: 'Print receipt',
                   icon: const Icon(Icons.print_rounded, color: _muted),
@@ -1410,6 +2022,10 @@ class _HomePageState extends State<HomePage> {
                 ),
               ],
             ),
+            if (compact) ...[
+              const SizedBox(height: 12),
+              Align(alignment: Alignment.centerLeft, child: badge),
+            ],
             const SizedBox(height: 16),
             Text(
               r.subject,
@@ -1432,7 +2048,8 @@ class _HomePageState extends State<HomePage> {
             const SizedBox(height: 14),
             _infoRow(Icons.place_rounded, r.location),
             const SizedBox(height: 8),
-            _infoRow(Icons.person_rounded, '${r.requesterName} - ${r.designation}'),
+            _infoRow(
+                Icons.person_rounded, '${r.requesterName} - ${r.designation}'),
             if (r.completedAt != null) ...[
               const SizedBox(height: 8),
               _infoRow(Icons.event_available_rounded,
@@ -1462,7 +2079,7 @@ class _HomePageState extends State<HomePage> {
         borderRadius: BorderRadius.circular(24),
         boxShadow: _shadow,
       ),
-      child: const Center(child: CircularProgressIndicator()),
+      child: const Center(child: CircularProgressIndicator(color: _primary)),
     );
   }
 
@@ -1498,6 +2115,10 @@ class _HomePageState extends State<HomePage> {
           ),
           const SizedBox(height: 18),
           FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: _primary,
+              foregroundColor: Colors.white,
+            ),
             onPressed: _load,
             icon: const Icon(Icons.refresh_rounded),
             label: const Text('Try again'),
@@ -1575,7 +2196,8 @@ class _HomePageState extends State<HomePage> {
             FilledButton.icon(
               style: FilledButton.styleFrom(
                 backgroundColor: _primary,
-                padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
@@ -1635,21 +2257,19 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _content(bool wide) {
+    final sw = MediaQuery.of(context).size.width;
+    final hPad = wide ? 32.0 : (sw < 400 ? 12.0 : 16.0);
+
     return Column(
       children: [
         if (!wide) _mobileBar(),
         Expanded(
           child: SingleChildScrollView(
             controller: _scroll,
-            padding: EdgeInsets.fromLTRB(
-              wide ? 32 : 16,
-              wide ? 28 : 8,
-              wide ? 32 : 16,
-              100,
-            ),
+            padding: EdgeInsets.fromLTRB(hPad, wide ? 28 : 8, hPad, 100),
             child: Center(
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1100),
+                constraints: const BoxConstraints(maxWidth: 1280),
                 child: LayoutBuilder(
                   builder: (context, c) {
                     final w = c.maxWidth;
@@ -1822,7 +2442,16 @@ class _HomePageState extends State<HomePage> {
                   r.addressedTitle.isEmpty
                       ? r.addressedTo
                       : '${r.addressedTo} (${r.addressedTitle})'),
-              field(Icons.person_rounded, 'Requested by', '${r.requesterName} (${r.designation})'),
+              field(Icons.person_rounded, 'Requested by',
+                  '${r.requesterName} (${r.designation})'),
+              field(
+                  Icons.engineering_rounded,
+                  'Acknowledged by',
+                  r.acknowledgedBy.isEmpty
+                      ? 'Not assigned yet'
+                      : (r.acknowledgedTitle.isEmpty
+                          ? r.acknowledgedBy
+                          : '${r.acknowledgedBy} (${r.acknowledgedTitle})')),
               field(Icons.place_rounded, 'Location', r.location),
               field(Icons.category_rounded, 'Type', r.type),
               field(Icons.flag_rounded, 'Priority', r.priority),
@@ -1937,8 +2566,9 @@ class _HomePageState extends State<HomePage> {
       drawer: wide
           ? null
           : Drawer(
-              width: 280,
+              width: 290,
               backgroundColor: Colors.transparent,
+              elevation: 0,
               shape: const RoundedRectangleBorder(),
               child: _sidebar(drawer: true),
             ),
@@ -1956,7 +2586,8 @@ class _HomePageState extends State<HomePage> {
               foregroundColor: Colors.white,
               onPressed: () => _openForm(),
               icon: const Icon(Icons.add_rounded),
-              label: const Text('New Request'),
+              label: const Text('New Request',
+                  style: TextStyle(fontWeight: FontWeight.w700)),
             ),
     );
   }
@@ -1996,24 +2627,28 @@ class _DonutPainter extends CustomPainter {
     final total = values.fold<double>(0, (a, b) => a + b);
     if (total <= 0) return;
 
-    var start = -math.pi / 2;
+    // Small gap between segments (only when more than one has data).
+    final active = values.where((v) => v > 0).length;
+    final gap = active > 1 ? 0.07 : 0.0;
+
+    var start = -math.pi / 2 + gap / 2;
     for (var i = 0; i < values.length; i++) {
       if (values[i] <= 0) continue;
-      final sweep = (values[i] / total) * math.pi * 2 * progress;
+      final full = (values[i] / total) * math.pi * 2;
+      final sweep = math.max(0.0, full - gap) * progress;
       final p = Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = stroke
         ..strokeCap = StrokeCap.butt
         ..color = colors[i];
       canvas.drawArc(rect, start, sweep, false, p);
-      start += sweep;
+      start += full;
     }
   }
 
   @override
   bool shouldRepaint(covariant _DonutPainter old) =>
-      old.progress != progress ||
-      old.values.join(',') != values.join(',');
+      old.progress != progress || old.values.join(',') != values.join(',');
 }
 
 class _HoverCard extends StatefulWidget {
@@ -2045,14 +2680,14 @@ class _HoverCardState extends State<_HoverCard> {
             borderRadius: BorderRadius.circular(22),
             border: Border.all(
               color: _hover
-                  ? const Color(0xFF2563EB).withOpacity(0.4)
-                  : Colors.transparent,
-              width: 1.5,
+                  ? const Color(0xFF087F75).withOpacity(0.45)
+                  : const Color(0xFFE8EFEB),
+              width: 1.2,
             ),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF1E3A8A)
-                    .withOpacity(_hover ? 0.16 : 0.07),
+                color:
+                    const Color(0xFF193C42).withOpacity(_hover ? 0.14 : 0.07),
                 blurRadius: _hover ? 30 : 24,
                 offset: Offset(0, _hover ? 16 : 10),
               ),

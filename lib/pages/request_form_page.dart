@@ -3,38 +3,28 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/maintenance_request.dart';
 import '../services/request_repository.dart';
 
-const List<String> requestStatusOptions = ['Pending', 'In Progress', 'Completed'];
+const List<String> requestStatusOptions = [
+  'Pending',
+  'In Progress',
+  'Completed'
+];
 
 String formatDate(DateTime date) {
   const months = <String>[
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
   ];
   return '${months[date.month - 1]} ${date.day}, ${date.year}';
-}
-
-IconData typeIcon(String type) {
-  final t = type.toLowerCase();
-  switch (t) {
-    case 'electrical':
-    case 'power':
-      return Icons.electrical_services_rounded;
-    case 'plumbing':
-      return Icons.plumbing_rounded;
-    case 'hvac':
-    case 'aircon':
-      return Icons.ac_unit_rounded;
-    case 'civil':
-    case 'structural':
-      return Icons.construction_rounded;
-    case 'relocation':
-    case 'service':
-      return Icons.swap_horiz_rounded;
-    case 'repair':
-    case 'maintenance':
-    default:
-      return Icons.build_rounded;
-  }
 }
 
 Color priorityColor(String priority) {
@@ -76,10 +66,12 @@ class _RequestFormPageState extends State<RequestFormPage> {
 
   late DateTime _date;
   DateTime? _completed;
-  late String _type;
   late String _priority;
+  late final TextEditingController _type;
   late final TextEditingController _to;
   late final TextEditingController _title;
+  late final TextEditingController _ack;
+  late final TextEditingController _ackTitle;
   late final TextEditingController _name;
   late final TextEditingController _designation;
   late final TextEditingController _location;
@@ -96,10 +88,12 @@ class _RequestFormPageState extends State<RequestFormPage> {
     final e = widget.existing;
     _date = e?.date ?? DateTime.now();
     _completed = e?.completedAt;
-    _type = e?.type ?? requestTypes.first;
+    _type = TextEditingController(text: e?.type ?? '');
     _priority = e?.priority ?? 'Normal';
     _to = TextEditingController(text: e?.addressedTo ?? '');
-    _title = TextEditingController(text: e?.addressedTitle ?? 'Dept. Manager');
+    _title = TextEditingController(text: e?.addressedTitle ?? '');
+    _ack = TextEditingController(text: e?.acknowledgedBy ?? '');
+    _ackTitle = TextEditingController(text: e?.acknowledgedTitle ?? '');
     _name = TextEditingController(text: e?.requesterName ?? '');
     _designation = TextEditingController(text: e?.designation ?? '');
     _location = TextEditingController(text: e?.location ?? '');
@@ -111,8 +105,11 @@ class _RequestFormPageState extends State<RequestFormPage> {
   @override
   void dispose() {
     for (final c in [
+      _type,
       _to,
       _title,
+      _ack,
+      _ackTitle,
       _name,
       _designation,
       _location,
@@ -164,7 +161,7 @@ class _RequestFormPageState extends State<RequestFormPage> {
         requesterName: _name.text.trim(),
         designation: _designation.text.trim(),
         location: _location.text.trim(),
-        type: _type,
+        type: _type.text.trim(),
         priority: _priority,
         subject: _subject.text.trim(),
         details: _details.text.trim(),
@@ -174,6 +171,8 @@ class _RequestFormPageState extends State<RequestFormPage> {
             : (widget.existing?.status ?? 'Pending'),
         completedAt: _completed,
         addressedTitle: _title.text.trim(),
+        acknowledgedBy: _ack.text.trim(),
+        acknowledgedTitle: _ackTitle.text.trim(),
       );
 
   /// Validates the form, saves it to Supabase, then closes the page.
@@ -190,8 +189,8 @@ class _RequestFormPageState extends State<RequestFormPage> {
     if (_completed != null && _completed!.isBefore(_date)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content:
-                Text('Completed time cannot be earlier than the requested time')),
+            content: Text(
+                'Completed time cannot be earlier than the requested time')),
       );
       return;
     }
@@ -258,9 +257,6 @@ class _RequestFormPageState extends State<RequestFormPage> {
       focusedErrorBorder: _border(Colors.red, 1.8),
     );
   }
-
-  String? _required(String? v) =>
-      (v == null || v.trim().isEmpty) ? 'This field is required' : null;
 
   List<Widget> _spaced(List<Widget> items) => [
         for (var i = 0; i < items.length; i++) ...[
@@ -484,9 +480,8 @@ class _RequestFormPageState extends State<RequestFormPage> {
                             child: CircularProgressIndicator(
                                 strokeWidth: 2.4, color: Colors.white),
                           )
-                        : Icon(_editing
-                            ? Icons.save_rounded
-                            : Icons.send_rounded),
+                        : Icon(
+                            _editing ? Icons.save_rounded : Icons.send_rounded),
                     label: Text(
                       _saving
                           ? 'Saving...'
@@ -547,8 +542,7 @@ class _RequestFormPageState extends State<RequestFormPage> {
         children: [
           Row(
             children: [
-              const Icon(Icons.receipt_long_rounded,
-                  color: _primary, size: 20),
+              const Icon(Icons.receipt_long_rounded, color: _primary, size: 20),
               const SizedBox(width: 8),
               const Text('LIVE PREVIEW',
                   style: TextStyle(
@@ -572,11 +566,14 @@ class _RequestFormPageState extends State<RequestFormPage> {
                 height: 1.3),
           ),
           const SizedBox(height: 10),
+          if (_type.text.trim().isNotEmpty)
+            line('Request type', _type.text.trim()),
           line('Requested', formatDateTime(_date)),
           line('Completed',
               _completed == null ? '-' : formatDateTime(_completed!)),
           line('To', v(_to, '-')),
           line('Title', v(_title, '-')),
+          line('Assigned', v(_ack, '-')),
           line('From', v(_name, '-')),
           line('Designation', v(_designation, '-')),
           line('Location', v(_location, '-')),
@@ -590,19 +587,6 @@ class _RequestFormPageState extends State<RequestFormPage> {
             spacing: 8,
             runSpacing: 8,
             children: [
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: _primary.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(_type,
-                    style: const TextStyle(
-                        color: _primary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700)),
-              ),
               Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -659,8 +643,7 @@ class _RequestFormPageState extends State<RequestFormPage> {
                         : IconButton(
                             tooltip: 'Clear',
                             icon: const Icon(Icons.close_rounded, size: 18),
-                            onPressed: () =>
-                                setState(() => _completed = null),
+                            onPressed: () => setState(() => _completed = null),
                           ),
                   ),
                   child: Text(
@@ -679,7 +662,6 @@ class _RequestFormPageState extends State<RequestFormPage> {
                 controller: _to,
                 decoration: _dec('To (signs the receipt)', Icons.send_rounded,
                     hint: 'e.g. Engr. Ferdinand S. Abrigo'),
-                validator: _required,
               ),
               TextFormField(
                 controller: _title,
@@ -694,38 +676,29 @@ class _RequestFormPageState extends State<RequestFormPage> {
               TextFormField(
                 controller: _name,
                 decoration: _dec('Requester name', Icons.person_rounded),
-                validator: _required,
               ),
               TextFormField(
                 controller: _designation,
                 decoration: _dec('Designation', Icons.badge_rounded,
                     hint: 'e.g. Operator'),
-                validator: _required,
               ),
             ),
             TextFormField(
               controller: _location,
               decoration: _dec('Location / Site', Icons.place_rounded,
                   hint: 'e.g. Sta. Veronica PW'),
-              validator: _required,
             ),
           ]),
           _card(3, Icons.build_circle_rounded, 'Request',
               'What needs to be done and how urgent is it?', [
-            const Text('Request type',
-                style: TextStyle(color: _ink, fontWeight: FontWeight.w700)),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: requestTypes.map((t) {
-                return _choice(
-                  label: t,
-                  icon: typeIcon(t),
-                  color: _primary,
-                  selected: _type == t,
-                  onTap: () => setState(() => _type = t),
-                );
-              }).toList(),
+            TextFormField(
+              controller: _type,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: _dec(
+                'Request type (optional)',
+                Icons.category_rounded,
+                hint: 'e.g. Electrical, Plumbing, Equipment repair',
+              ),
             ),
             const Text('Priority',
                 style: TextStyle(color: _ink, fontWeight: FontWeight.w700)),
@@ -746,14 +719,12 @@ class _RequestFormPageState extends State<RequestFormPage> {
               controller: _subject,
               decoration: _dec('Subject', Icons.title_rounded,
                   hint: 'e.g. Relocation of 220V service wire'),
-              validator: _required,
             ),
             TextFormField(
               controller: _details,
               maxLines: 5,
               minLines: 4,
               decoration: _dec('Details of the request', Icons.notes_rounded),
-              validator: _required,
             ),
             TextFormField(
               controller: _reason,
@@ -762,6 +733,22 @@ class _RequestFormPageState extends State<RequestFormPage> {
               decoration: _dec(
                   'Reason / Purpose (optional)', Icons.help_outline_rounded,
                   hint: 'e.g. To prevent the risk of electrocution'),
+            ),
+          ]),
+          _card(4, Icons.verified_user_rounded, 'Acknowledgement',
+              'Who will carry out this request? They sign on the receipt.', [
+            _pair(
+              TextFormField(
+                controller: _ack,
+                decoration: _dec(
+                    'Acknowledged by (name)', Icons.engineering_rounded,
+                    hint: 'e.g. Juan Dela Cruz'),
+              ),
+              TextFormField(
+                controller: _ackTitle,
+                decoration: _dec('Designation', Icons.badge_outlined,
+                    hint: 'e.g. Electrician'),
+              ),
             ),
           ]),
         ],

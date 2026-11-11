@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../services/account_repository.dart';
+import 'admin_page.dart';
 import 'home_page.dart';
 
 class LoginPage extends StatefulWidget {
@@ -9,34 +12,47 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-  static final Map<String, String> _users = {'admin': '1234'};
-
   static const _ink = Color(0xFF172B3A);
   static const _muted = Color(0xFF71818C);
   static const _teal = Color(0xFF087F75);
   static const _mint = Color(0xFFB8F2D8);
   static const _canvas = Color(0xFFF3F7F5);
 
+  final _repo = AccountRepository();
+
   bool _isSignUp = false;
   bool _hidePassword = true;
+  bool _busy = false;
 
-  final _loginUser = TextEditingController();
+  // True while we check whether the person is already signed in.
+  late bool _checking = Supabase.instance.client.auth.currentSession != null;
+
+  final _loginUsername = TextEditingController();
   final _loginPass = TextEditingController();
-  final _signUser = TextEditingController();
+  final _signName = TextEditingController();
+  final _signUsername = TextEditingController();
   final _signPass = TextEditingController();
   final _signConfirm = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    if (_checking) _enterWithSession();
+  }
+
+  @override
   void dispose() {
-    _loginUser.dispose();
+    _loginUsername.dispose();
     _loginPass.dispose();
-    _signUser.dispose();
+    _signName.dispose();
+    _signUsername.dispose();
     _signPass.dispose();
     _signConfirm.dispose();
     super.dispose();
   }
 
   void _msg(String text) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(text),
@@ -47,49 +63,171 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  void _login() {
-    final user = _loginUser.text.trim();
-    final pass = _loginPass.text;
-    if (user.isEmpty || pass.isEmpty) {
-      _msg('Please enter username and password');
-      return;
+  String _friendly(String m) {
+    final l = m.toLowerCase();
+    if (l.contains('invalid login')) return 'Invalid username or password';
+    if (l.contains('database error saving new user')) {
+      if (l.contains('column "email" of relation "profiles" does not exist')) {
+        return 'Your Supabase profile trigger still expects profiles.email, but your table has no email column. Rerun supabase/migrations/20261111000000_add_username_to_profiles.sql in the SQL Editor to update it.';
+      }
+      return 'Supabase could not save the new account. Run the username migration in supabase/migrations/20261111000000_add_username_to_profiles.sql in the Supabase SQL Editor. If it is already applied, check Supabase Logs > Postgres for the auth.users trigger error.';
     }
-    if (_users[user] == pass) {
+    if (l.contains('email signups are disabled') ||
+        l.contains('signup is disabled') ||
+        l.contains('signups not allowed')) {
+      return 'Username accounts still use a private Supabase email alias. In Supabase, enable new signups and the Email provider, then turn off email confirmation. Users will continue to enter only a username here.';
+    }
+    if (l.contains('email not confirmed')) {
+      return 'Email confirmation is enabled in Supabase. Turn off "Confirm email"; users do not need an email address.';
+    }
+    if (l.contains('already registered') || l.contains('duplicate key')) {
+      return 'That username is already taken';
+    }
+    if (l.contains('password') && l.contains('6')) {
+      return 'Password must be at least 6 characters';
+    }
+    return m;
+  }
+
+  /// Signed in with Supabase -> check approval and open the right page.
+  Future<void> _enterWithSession() async {
+    try {
+      final profile = await _repo.myProfile();
+      if (!mounted) return;
+
+      if (profile == null) {
+        await _failAndSignOut(
+            'Your account could not be found. Please contact the admin.');
+        return;
+      }
+      if (profile.status == 'pending') {
+        await _failAndSignOut('Your account is waiting for admin approval.');
+        return;
+      }
+      if (profile.status == 'blocked') {
+        await _failAndSignOut(
+            'Your account has been blocked. Please contact the admin.');
+        return;
+      }
+
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => HomePage(username: user)),
+        MaterialPageRoute(
+          builder: (_) => HomePage(
+            username: profile.displayName,
+            profile: profile,
+          ),
+        ),
       );
-    } else {
-      _msg('Invalid username or password');
+    } catch (e) {
+      await _failAndSignOut('Could not sign in: $e');
     }
   }
 
-  void _signUp() {
-    final user = _signUser.text.trim();
+  Future<void> _failAndSignOut(String message) async {
+    try {
+      await Supabase.instance.client.auth.signOut();
+    } catch (_) {}
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      _checking = false;
+    });
+    _msg(message);
+  }
+
+  Future<void> _login() async {
+    if (_busy) return;
+    final username = _loginUsername.text.trim().toLowerCase();
+    final pass = _loginPass.text;
+    if (username.isEmpty || pass.isEmpty) {
+      _msg('Please enter your username and password');
+      return;
+    }
+
+    setState(() => _busy = true);
+    try {
+      await Supabase.instance.client.auth.signInWithPassword(
+        email: _usernameEmail(username),
+        password: pass,
+      );
+      await _enterWithSession();
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      _msg(_friendly(e.message));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      _msg('Could not connect. Please check your internet and try again.');
+    }
+  }
+
+  Future<void> _signUp() async {
+    if (_busy) return;
+    final name = _signName.text.trim();
+    final username = _signUsername.text.trim().toLowerCase();
     final pass = _signPass.text;
-    if (user.isEmpty || pass.isEmpty || _signConfirm.text.isEmpty) {
+
+    if (name.isEmpty ||
+        username.isEmpty ||
+        pass.isEmpty ||
+        _signConfirm.text.isEmpty) {
       _msg('Please fill in all fields');
+      return;
+    }
+    if (!RegExp(r'^[a-z0-9_]{3,24}$').hasMatch(username)) {
+      _msg(
+          'Username must be 3-24 characters: letters, numbers, or underscores');
+      return;
+    }
+    if (pass.length < 6) {
+      _msg('Password must be at least 6 characters');
       return;
     }
     if (pass != _signConfirm.text) {
       _msg('Passwords do not match');
       return;
     }
-    if (_users.containsKey(user)) {
-      _msg('Username already exists');
-      return;
+
+    setState(() => _busy = true);
+    try {
+      final auth = Supabase.instance.client.auth;
+      final res = await auth.signUp(
+        email: _usernameEmail(username),
+        password: pass,
+        data: {'full_name': name, 'username': username},
+      );
+
+      final message = res.session == null
+          ? 'Supabase did not start a session. Enable new signups and the Email provider, and turn off email confirmation in Supabase.'
+          : 'Account created! Please wait for the admin to approve it before you sign in.';
+      if (res.session != null) await auth.signOut();
+
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _loginUsername.text = username;
+        _loginPass.clear();
+        _signName.clear();
+        _signUsername.clear();
+        _signPass.clear();
+        _signConfirm.clear();
+        _isSignUp = false;
+      });
+      _msg(message);
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      _msg(_friendly(e.message));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      _msg('Could not create the account: $e');
     }
-    setState(() {
-      _users[user] = pass;
-      _loginUser.text = user;
-      _loginPass.clear();
-      _signUser.clear();
-      _signPass.clear();
-      _signConfirm.clear();
-      _isSignUp = false;
-    });
-    _msg('Account created! You can now log in.');
   }
+
+  String _usernameEmail(String username) => '$username@maintenance.invalid';
 
   InputDecoration _fieldDecoration(
     String hint,
@@ -150,20 +288,36 @@ class _LoginPageState extends State<LoginPage> {
           const SizedBox(height: 8),
           Text(
             signUp
-                ? 'Set up your workspace access in just a moment.'
+                ? 'The admin will approve your account before you can sign in.'
                 : 'Sign in to pick up where your team left off.',
             style: const TextStyle(color: _muted, fontSize: 14, height: 1.5),
           ),
           const SizedBox(height: 30),
+          if (signUp) ...[
+            _fieldLabel('FULL NAME'),
+            const SizedBox(height: 9),
+            TextField(
+              controller: _signName,
+              textInputAction: TextInputAction.next,
+              textCapitalization: TextCapitalization.words,
+              autofillHints: const [AutofillHints.name],
+              decoration: _fieldDecoration(
+                'Enter your full name',
+                Icons.person_outline,
+              ),
+            ),
+            const SizedBox(height: 19),
+          ],
           _fieldLabel('USERNAME'),
           const SizedBox(height: 9),
           TextField(
-            controller: signUp ? _signUser : _loginUser,
+            controller: signUp ? _signUsername : _loginUsername,
+            keyboardType: TextInputType.text,
             textInputAction: TextInputAction.next,
             autofillHints: const [AutofillHints.username],
             decoration: _fieldDecoration(
               'Enter your username',
-              Icons.person_outline,
+              Icons.alternate_email_rounded,
             ),
           ),
           const SizedBox(height: 19),
@@ -172,9 +326,8 @@ class _LoginPageState extends State<LoginPage> {
           TextField(
             controller: signUp ? _signPass : _loginPass,
             obscureText: _hidePassword,
-            textInputAction: signUp
-                ? TextInputAction.next
-                : TextInputAction.done,
+            textInputAction:
+                signUp ? TextInputAction.next : TextInputAction.done,
             autofillHints: [
               signUp ? AutofillHints.newPassword : AutofillHints.password,
             ],
@@ -205,50 +358,42 @@ class _LoginPageState extends State<LoginPage> {
             width: double.infinity,
             height: 54,
             child: FilledButton(
-              onPressed: signUp ? _signUp : _login,
+              onPressed: _busy ? null : (signUp ? _signUp : _login),
               style: FilledButton.styleFrom(
                 backgroundColor: _teal,
                 foregroundColor: Colors.white,
+                disabledBackgroundColor: _teal.withValues(alpha: 0.6),
+                disabledForegroundColor: Colors.white,
                 elevation: 0,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    signUp ? 'Create account' : 'Sign in',
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
+              child: _busy
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.4,
+                        color: Colors.white,
+                      ),
+                    )
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          signUp ? 'Create account' : 'Sign in',
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(width: 9),
+                        const Icon(Icons.arrow_forward_rounded, size: 18),
+                      ],
                     ),
-                  ),
-                  const SizedBox(width: 9),
-                  const Icon(Icons.arrow_forward_rounded, size: 18),
-                ],
-              ),
             ),
           ),
-          if (!signUp) ...[
-            const SizedBox(height: 18),
-            Center(
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF3F7F5),
-                  borderRadius: BorderRadius.circular(30),
-                ),
-                child: const Text(
-                  'Demo: admin / 1234',
-                  style: TextStyle(color: _muted, fontSize: 12),
-                ),
-              ),
-            ),
-          ],
           const SizedBox(height: 24),
           Center(
             child: Wrap(
@@ -260,7 +405,9 @@ class _LoginPageState extends State<LoginPage> {
                   style: const TextStyle(color: _muted, fontSize: 13),
                 ),
                 TextButton(
-                  onPressed: () => setState(() => _isSignUp = !_isSignUp),
+                  onPressed: _busy
+                      ? null
+                      : () => setState(() => _isSignUp = !_isSignUp),
                   style: TextButton.styleFrom(
                     foregroundColor: _teal,
                     padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -464,7 +611,6 @@ class _LoginPageState extends State<LoginPage> {
 
   Widget _desktopLayout() {
     return Container(
-      height: 620,
       constraints: const BoxConstraints(maxWidth: 1050, minHeight: 620),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -479,25 +625,29 @@ class _LoginPageState extends State<LoginPage> {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(28),
-        child: Row(
-          children: [
-            Expanded(flex: 44, child: _brandPanel()),
-            Expanded(
-              flex: 56,
-              child: Center(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 62,
-                    vertical: 42,
-                  ),
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 390),
-                    child: _authForm(),
+        child: SizedBox(
+          // Taller when creating an account (more fields).
+          height: _isSignUp ? 720 : 620,
+          child: Row(
+            children: [
+              Expanded(flex: 44, child: _brandPanel()),
+              Expanded(
+                flex: 56,
+                child: Center(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 62,
+                      vertical: 42,
+                    ),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 390),
+                      child: _authForm(),
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -567,6 +717,14 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Already signed in? Show a spinner while we open the right page.
+    if (_checking) {
+      return const Scaffold(
+        backgroundColor: _canvas,
+        body: Center(child: CircularProgressIndicator(color: _teal)),
+      );
+    }
+
     return Scaffold(
       backgroundColor: _canvas,
       body: SafeArea(

@@ -1,14 +1,5 @@
 import 'package:flutter/material.dart';
 
-const List<String> requestTypes = [
-  'Electrical',
-  'Plumbing',
-  'HVAC',
-  'Civil',
-  'Relocation',
-  'Repair',
-];
-
 const List<String> priorities = ['Low', 'Normal', 'High', 'Urgent'];
 const List<String> statuses = ['Pending', 'In Progress', 'Completed'];
 
@@ -66,8 +57,18 @@ IconData typeIcon(String type) {
 
 String formatDate(DateTime d) {
   const months = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec'
   ];
   return '${months[d.month - 1]} ${d.day}, ${d.year}';
 }
@@ -98,6 +99,8 @@ class MaintenanceRequest {
   String status;
   DateTime? completedAt;
   String addressedTitle;
+  String acknowledgedBy;
+  String acknowledgedTitle;
 
   MaintenanceRequest({
     required this.id,
@@ -114,13 +117,16 @@ class MaintenanceRequest {
     this.status = 'Pending',
     this.completedAt,
     this.addressedTitle = 'Dept. Manager',
+    this.acknowledgedBy = '',
+    this.acknowledgedTitle = '',
   });
 
   /// Row coming from Supabase -> app object.
   factory MaintenanceRequest.fromMap(Map<String, dynamic> m) {
     return MaintenanceRequest(
       id: m['id'] as String,
-      date: DateTime.parse((m['requested_at'] ?? m['date']) as String).toLocal(),
+      date:
+          DateTime.parse((m['requested_at'] ?? m['date']) as String).toLocal(),
       addressedTo: m['addressed_to'] as String,
       requesterName: m['requester_name'] as String,
       designation: m['designation'] as String,
@@ -135,6 +141,8 @@ class MaintenanceRequest {
           ? null
           : DateTime.parse(m['completed_at'] as String).toLocal(),
       addressedTitle: (m['addressed_title'] as String?) ?? 'Dept. Manager',
+      acknowledgedBy: (m['acknowledged_by'] as String?) ?? '',
+      acknowledgedTitle: (m['acknowledged_title'] as String?) ?? '',
     );
   }
 
@@ -159,6 +167,8 @@ class MaintenanceRequest {
       'status': status,
       'completed_at': completedAt?.toUtc().toIso8601String(),
       'addressed_title': addressedTitle,
+      'acknowledged_by': acknowledgedBy,
+      'acknowledged_title': acknowledgedTitle,
     };
   }
 }
