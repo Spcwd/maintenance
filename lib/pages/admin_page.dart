@@ -21,7 +21,6 @@ class _AdminHomePageState extends State<AdminHomePage> {
   static const _navy2 = Color(0xFF102B38);
   static const _mint = Color(0xFFB8F2D8);
   static const _canvas = Color(0xFFF3F7F5);
-  static const _field = Color(0xFFF5F8F7);
   static const _ink = Color(0xFF172B3A);
   static const _muted = Color(0xFF71818C);
   static const _line = Color(0xFFE7EEEA);
@@ -96,7 +95,8 @@ class _AdminHomePageState extends State<AdminHomePage> {
     final q = _search.toLowerCase();
     return _accounts.where((a) {
       final okStatus = _filter == 'All' || a.status == _filter.toLowerCase();
-      final okSearch = q.isEmpty ||
+      final okSearch =
+          q.isEmpty ||
           a.fullName.toLowerCase().contains(q) ||
           a.username.toLowerCase().contains(q) ||
           a.email.toLowerCase().contains(q);
@@ -201,8 +201,9 @@ class _AdminHomePageState extends State<AdminHomePage> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
           title: Text("Change ${p.displayName}'s password"),
           content: Form(
             key: formKey,
@@ -219,9 +220,11 @@ class _AdminHomePageState extends State<AdminHomePage> {
                       tooltip: hidePassword ? 'Show password' : 'Hide password',
                       onPressed: () =>
                           setDialogState(() => hidePassword = !hidePassword),
-                      icon: Icon(hidePassword
-                          ? Icons.visibility_outlined
-                          : Icons.visibility_off_outlined),
+                      icon: Icon(
+                        hidePassword
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
+                      ),
                     ),
                   ),
                   validator: (value) {
@@ -237,13 +240,17 @@ class _AdminHomePageState extends State<AdminHomePage> {
                   decoration: InputDecoration(
                     labelText: 'Confirm new password',
                     suffixIcon: IconButton(
-                      tooltip:
-                          hideConfirmation ? 'Show password' : 'Hide password',
+                      tooltip: hideConfirmation
+                          ? 'Show password'
+                          : 'Hide password',
                       onPressed: () => setDialogState(
-                          () => hideConfirmation = !hideConfirmation),
-                      icon: Icon(hideConfirmation
-                          ? Icons.visibility_outlined
-                          : Icons.visibility_off_outlined),
+                        () => hideConfirmation = !hideConfirmation,
+                      ),
+                      icon: Icon(
+                        hideConfirmation
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
+                      ),
                     ),
                   ),
                   validator: (value) {
@@ -312,12 +319,12 @@ class _AdminHomePageState extends State<AdminHomePage> {
   // ----------------------------------------------------------------- helpers
 
   List<BoxShadow> get _shadow => [
-        BoxShadow(
-          color: const Color(0xFF193C42).withOpacity(0.07),
-          blurRadius: 28,
-          offset: const Offset(0, 12),
-        ),
-      ];
+    BoxShadow(
+      color: const Color(0xFF193C42).withOpacity(0.07),
+      blurRadius: 28,
+      offset: const Offset(0, 12),
+    ),
+  ];
 
   Color _statusColor(String s) {
     switch (s) {
@@ -363,6 +370,63 @@ class _AdminHomePageState extends State<AdminHomePage> {
 
   // ----------------------------------------------------------------- sidebar
 
+  Widget _sidebarFilter(String label, IconData icon, Color color) {
+    final selected = _filter == label;
+
+    return Padding(
+      padding: const EdgeInsets.only(left: 14, top: 3, bottom: 3),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => setState(() => _filter = label),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          decoration: BoxDecoration(
+            color: selected
+                ? Colors.white.withOpacity(0.12)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                icon,
+                size: 18,
+                color: selected ? _mint : Colors.white.withOpacity(0.62),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    color: selected ? Colors.white : Colors.white70,
+                    fontSize: 13,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: selected ? color : Colors.white.withOpacity(0.10),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '${_count(label.toLowerCase())}',
+                  style: TextStyle(
+                    color: selected ? _ink : Colors.white70,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _sidebar() {
     final screenW = MediaQuery.of(context).size.width;
     final initial = widget.profile.displayName.isEmpty
@@ -406,7 +470,9 @@ class _AdminHomePageState extends State<AdminHomePage> {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: Border.all(
-                      color: Colors.white.withOpacity(0.06), width: 1),
+                    color: Colors.white.withOpacity(0.06),
+                    width: 1,
+                  ),
                 ),
               ),
             ),
@@ -436,8 +502,11 @@ class _AdminHomePageState extends State<AdminHomePage> {
                           color: Colors.white.withOpacity(0.12),
                           borderRadius: BorderRadius.circular(15),
                         ),
-                        child: const Icon(Icons.handyman_rounded,
-                            color: _mint, size: 24),
+                        child: const Icon(
+                          Icons.handyman_rounded,
+                          color: _mint,
+                          size: 24,
+                        ),
                       ),
                       const SizedBox(width: 12),
                       const Expanded(
@@ -460,11 +529,16 @@ class _AdminHomePageState extends State<AdminHomePage> {
                     onTap: _openWorkOrders,
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 12),
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
                       child: Row(
                         children: [
-                          Icon(Icons.work_outline_rounded,
-                              size: 22, color: Colors.white.withOpacity(0.68)),
+                          Icon(
+                            Icons.work_outline_rounded,
+                            size: 22,
+                            color: Colors.white.withOpacity(0.68),
+                          ),
                           const SizedBox(width: 12),
                           const Text(
                             'Work orders',
@@ -492,7 +566,9 @@ class _AdminHomePageState extends State<AdminHomePage> {
                   ),
                   Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 12),
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.12),
                       borderRadius: BorderRadius.circular(16),
@@ -500,8 +576,11 @@ class _AdminHomePageState extends State<AdminHomePage> {
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.admin_panel_settings_rounded,
-                            size: 22, color: _mint),
+                        const Icon(
+                          Icons.admin_panel_settings_rounded,
+                          size: 22,
+                          color: _mint,
+                        ),
                         const SizedBox(width: 12),
                         const Expanded(
                           child: Text(
@@ -515,7 +594,9 @@ class _AdminHomePageState extends State<AdminHomePage> {
                         if (_count('pending') > 0)
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 9, vertical: 3),
+                              horizontal: 9,
+                              vertical: 3,
+                            ),
                             decoration: BoxDecoration(
                               color: _amber,
                               borderRadius: BorderRadius.circular(10),
@@ -531,6 +612,17 @@ class _AdminHomePageState extends State<AdminHomePage> {
                       ],
                     ),
                   ),
+                  _sidebarFilter(
+                    'Pending',
+                    Icons.hourglass_top_rounded,
+                    _amber,
+                  ),
+                  _sidebarFilter(
+                    'Approved',
+                    Icons.verified_rounded,
+                    _tealLight,
+                  ),
+                  _sidebarFilter('Blocked', Icons.block_rounded, _red),
                   const Spacer(),
                   Container(
                     padding: const EdgeInsets.all(12),
@@ -584,12 +676,17 @@ class _AdminHomePageState extends State<AdminHomePage> {
                     borderRadius: BorderRadius.circular(16),
                     onTap: _logout,
                     child: const Padding(
-                      padding:
-                          EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
                       child: Row(
                         children: [
-                          Icon(Icons.logout_rounded,
-                              size: 22, color: Color(0xFFFCA5A5)),
+                          Icon(
+                            Icons.logout_rounded,
+                            size: 22,
+                            color: Color(0xFFFCA5A5),
+                          ),
                           SizedBox(width: 12),
                           Text(
                             'Log out',
@@ -623,8 +720,11 @@ class _AdminHomePageState extends State<AdminHomePage> {
               color: _teal,
               borderRadius: BorderRadius.circular(13),
             ),
-            child: const Icon(Icons.handyman_rounded,
-                color: Colors.white, size: 21),
+            child: const Icon(
+              Icons.handyman_rounded,
+              color: Colors.white,
+              size: 21,
+            ),
           ),
           const SizedBox(width: 12),
           const Expanded(
@@ -665,8 +765,8 @@ class _AdminHomePageState extends State<AdminHomePage> {
     final message = pending == 0
         ? 'All accounts have been reviewed.'
         : (pending == 1
-            ? '1 account is waiting for your approval.'
-            : '$pending accounts are waiting for your approval.');
+              ? '1 account is waiting for your approval.'
+              : '$pending accounts are waiting for your approval.');
 
     final button = pending == 0
         ? null
@@ -677,12 +777,15 @@ class _AdminHomePageState extends State<AdminHomePage> {
               elevation: 0,
               padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14)),
+                borderRadius: BorderRadius.circular(14),
+              ),
             ),
             onPressed: () => setState(() => _filter = 'Pending'),
             icon: const Icon(Icons.fact_check_rounded),
-            label: const Text('Review pending',
-                style: TextStyle(fontWeight: FontWeight.w700)),
+            label: const Text(
+              'Review pending',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
           );
 
     final info = Column(
@@ -761,7 +864,9 @@ class _AdminHomePageState extends State<AdminHomePage> {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
-                        color: Colors.white.withOpacity(0.06), width: 1),
+                      color: Colors.white.withOpacity(0.06),
+                      width: 1,
+                    ),
                   ),
                 ),
               ),
@@ -808,7 +913,12 @@ class _AdminHomePageState extends State<AdminHomePage> {
   }
 
   Widget _statTile(
-      String label, int value, IconData icon, Color color, String filter) {
+    String label,
+    int value,
+    IconData icon,
+    Color color,
+    String filter,
+  ) {
     final selected = _filter == filter;
     return InkWell(
       borderRadius: BorderRadius.circular(20),
@@ -870,14 +980,34 @@ class _AdminHomePageState extends State<AdminHomePage> {
 
   Widget _stats(double w) {
     final tiles = <Widget>[
-      _statTile('Pending', _count('pending'), Icons.hourglass_top_rounded,
-          _amber, 'Pending'),
-      _statTile('Approved', _count('approved'), Icons.verified_rounded, _teal,
-          'Approved'),
       _statTile(
-          'Blocked', _count('blocked'), Icons.block_rounded, _red, 'Blocked'),
-      _statTile('All accounts', _accounts.length, Icons.groups_rounded,
-          const Color(0xFF3B82F6), 'All'),
+        'Pending',
+        _count('pending'),
+        Icons.hourglass_top_rounded,
+        _amber,
+        'Pending',
+      ),
+      _statTile(
+        'Approved',
+        _count('approved'),
+        Icons.verified_rounded,
+        _teal,
+        'Approved',
+      ),
+      _statTile(
+        'Blocked',
+        _count('blocked'),
+        Icons.block_rounded,
+        _red,
+        'Blocked',
+      ),
+      _statTile(
+        'All accounts',
+        _accounts.length,
+        Icons.groups_rounded,
+        const Color(0xFF3B82F6),
+        'All',
+      ),
     ];
 
     if (w >= 760) {
@@ -892,17 +1022,21 @@ class _AdminHomePageState extends State<AdminHomePage> {
     }
     return Column(
       children: [
-        Row(children: [
-          Expanded(child: tiles[0]),
-          const SizedBox(width: 12),
-          Expanded(child: tiles[1]),
-        ]),
+        Row(
+          children: [
+            Expanded(child: tiles[0]),
+            const SizedBox(width: 12),
+            Expanded(child: tiles[1]),
+          ],
+        ),
         const SizedBox(height: 12),
-        Row(children: [
-          Expanded(child: tiles[2]),
-          const SizedBox(width: 12),
-          Expanded(child: tiles[3]),
-        ]),
+        Row(
+          children: [
+            Expanded(child: tiles[2]),
+            const SizedBox(width: 12),
+            Expanded(child: tiles[3]),
+          ],
+        ),
       ],
     );
   }
@@ -920,13 +1054,18 @@ class _AdminHomePageState extends State<AdminHomePage> {
         decoration: InputDecoration(
           hintText: 'Search by name or username',
           hintStyle: const TextStyle(color: Color(0xFF9AA7AE), fontSize: 14),
-          prefixIcon: const Icon(Icons.search_rounded,
-              color: Color(0xFF82939B), size: 22),
+          prefixIcon: const Icon(
+            Icons.search_rounded,
+            color: Color(0xFF82939B),
+            size: 22,
+          ),
           suffixIcon: _search.isEmpty
               ? null
               : IconButton(
-                  icon:
-                      const Icon(Icons.close_rounded, color: Color(0xFF82939B)),
+                  icon: const Icon(
+                    Icons.close_rounded,
+                    color: Color(0xFF82939B),
+                  ),
                   onPressed: () {
                     _searchCtrl.clear();
                     setState(() => _search = '');
@@ -939,56 +1078,6 @@ class _AdminHomePageState extends State<AdminHomePage> {
     );
   }
 
-  Widget _pill(String label) {
-    final selected = _filter == label;
-    final count =
-        label == 'All' ? _accounts.length : _count(label.toLowerCase());
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(30),
-        onTap: () => setState(() => _filter = label),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          decoration: BoxDecoration(
-            color: selected ? _teal : Colors.white,
-            borderRadius: BorderRadius.circular(30),
-            border: Border.all(color: selected ? _teal : _line),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  color: selected ? Colors.white : _ink,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: selected ? Colors.white.withOpacity(0.25) : _field,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  '$count',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: selected ? Colors.white : _muted,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _actionBtn({
     required String label,
     required IconData icon,
@@ -996,8 +1085,9 @@ class _AdminHomePageState extends State<AdminHomePage> {
     required bool filled,
     required VoidCallback? onTap,
   }) {
-    final shape =
-        RoundedRectangleBorder(borderRadius: BorderRadius.circular(12));
+    final shape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(12),
+    );
     const pad = EdgeInsets.symmetric(horizontal: 16, vertical: 14);
     if (filled) {
       return FilledButton.icon(
@@ -1032,50 +1122,61 @@ class _AdminHomePageState extends State<AdminHomePage> {
     final color = _statusColor(p.status);
 
     final actions = <Widget>[];
-    actions.add(_actionBtn(
-      label: 'Change password',
-      icon: Icons.lock_reset_rounded,
-      color: _teal,
-      filled: false,
-      onTap: busy ? null : () => _changePassword(p),
-    ));
+    actions.add(
+      _actionBtn(
+        label: 'Change password',
+        icon: Icons.lock_reset_rounded,
+        color: _teal,
+        filled: false,
+        onTap: busy ? null : () => _changePassword(p),
+      ),
+    );
     if (!p.isAdmin && !isMe) {
       if (p.status == 'pending') {
-        actions.add(_actionBtn(
-          label: 'Approve',
-          icon: Icons.check_rounded,
-          color: _teal,
-          filled: true,
-          onTap: busy ? null : () => _approve(p),
-        ));
+        actions.add(
+          _actionBtn(
+            label: 'Approve',
+            icon: Icons.check_rounded,
+            color: _teal,
+            filled: true,
+            onTap: busy ? null : () => _approve(p),
+          ),
+        );
       } else if (p.status == 'blocked') {
-        actions.add(_actionBtn(
-          label: 'Unblock',
-          icon: Icons.lock_open_rounded,
-          color: _teal,
-          filled: true,
-          onTap: busy ? null : () => _unblock(p),
-        ));
+        actions.add(
+          _actionBtn(
+            label: 'Unblock',
+            icon: Icons.lock_open_rounded,
+            color: _teal,
+            filled: true,
+            onTap: busy ? null : () => _unblock(p),
+          ),
+        );
       } else {
-        actions.add(_actionBtn(
-          label: 'Block',
-          icon: Icons.block_rounded,
-          color: _amber,
-          filled: false,
-          onTap: busy ? null : () => _block(p),
-        ));
+        actions.add(
+          _actionBtn(
+            label: 'Block',
+            icon: Icons.block_rounded,
+            color: _amber,
+            filled: false,
+            onTap: busy ? null : () => _block(p),
+          ),
+        );
       }
-      actions.add(_actionBtn(
-        label: 'Delete',
-        icon: Icons.delete_outline_rounded,
-        color: _red,
-        filled: false,
-        onTap: busy ? null : () => _delete(p),
-      ));
+      actions.add(
+        _actionBtn(
+          label: 'Delete',
+          icon: Icons.delete_outline_rounded,
+          color: _red,
+          filled: false,
+          onTap: busy ? null : () => _delete(p),
+        ),
+      );
     }
 
-    final initial =
-        p.displayName.isEmpty ? '?' : p.displayName[0].toUpperCase();
+    final initial = p.displayName.isEmpty
+        ? '?'
+        : p.displayName[0].toUpperCase();
 
     final avatar = Container(
       width: 48,
@@ -1232,10 +1333,7 @@ class _AdminHomePageState extends State<AdminHomePage> {
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(color: _muted),
           ),
-          if (action != null) ...[
-            const SizedBox(height: 18),
-            action,
-          ],
+          if (action != null) ...[const SizedBox(height: 18), action],
         ],
       ),
     );
@@ -1276,19 +1374,19 @@ class _AdminHomePageState extends State<AdminHomePage> {
         icon: searching
             ? Icons.search_off_rounded
             : (_filter == 'Pending'
-                ? Icons.task_alt_rounded
-                : Icons.groups_rounded),
+                  ? Icons.task_alt_rounded
+                  : Icons.groups_rounded),
         color: _teal,
         title: searching
             ? 'No matching accounts'
             : (_filter == 'Pending'
-                ? 'No accounts waiting'
-                : 'No $_filter accounts'.replaceAll('No All ', 'No ')),
+                  ? 'No accounts waiting'
+                  : 'No $_filter accounts'.replaceAll('No All ', 'No ')),
         message: searching
             ? 'Try a different name or username.'
             : (_filter == 'Pending'
-                ? 'New sign-ups will show up here for your approval.'
-                : 'Nothing to show here yet.'),
+                  ? 'New sign-ups will show up here for your approval.'
+                  : 'Nothing to show here yet.'),
       );
     }
 
@@ -1323,18 +1421,6 @@ class _AdminHomePageState extends State<AdminHomePage> {
                   const SizedBox(height: 22),
                   _searchBar(),
                   const SizedBox(height: 16),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        _pill('Pending'),
-                        _pill('Approved'),
-                        _pill('Blocked'),
-                        _pill('All'),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 18),
                   _list(),
                 ],
               );

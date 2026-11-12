@@ -37,7 +37,7 @@ IconData typeIcon(String type) {
       return Icons.electrical_services_rounded;
     case 'plumbing':
       return Icons.plumbing_rounded;
-    case 'hvac':
+    case 'aircon':
     case 'aircon':
       return Icons.ac_unit_rounded;
     case 'civil':
