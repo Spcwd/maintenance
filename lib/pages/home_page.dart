@@ -1051,7 +1051,7 @@ class _HomePageState extends State<HomePage> {
               tween: Tween<double>(begin: 0, end: value.toDouble()),
               duration: const Duration(milliseconds: 700),
               curve: Curves.easeOutCubic,
-              builder: (_, v, __) => Text(
+              builder: (_, v, _) => Text(
                 '${v.round()}',
                 style: const TextStyle(
                   fontSize: 36,
@@ -1222,7 +1222,7 @@ class _HomePageState extends State<HomePage> {
                   ],
                 ),
               ),
-              if (trailing != null) trailing,
+              ?trailing,
             ],
           ),
           SizedBox(height: _small ? 18 : 22),
@@ -1298,7 +1298,7 @@ class _HomePageState extends State<HomePage> {
         tween: Tween<double>(begin: 0, end: 1),
         duration: const Duration(milliseconds: 900),
         curve: Curves.easeOutCubic,
-        builder: (_, t, __) => CustomPaint(
+        builder: (_, t, _) => CustomPaint(
           painter: _DonutPainter(
             values: [
               pending.toDouble(),
@@ -1409,7 +1409,7 @@ class _HomePageState extends State<HomePage> {
           tween: Tween<double>(begin: 0, end: frac),
           duration: const Duration(milliseconds: 700),
           curve: Curves.easeOutCubic,
-          builder: (_, v, __) => Align(
+          builder: (_, v, _) => Align(
             alignment: Alignment.centerLeft,
             child: FractionallySizedBox(
               widthFactor: v.clamp(0.0, 1.0),
@@ -1519,7 +1519,7 @@ class _HomePageState extends State<HomePage> {
           tween: Tween<double>(begin: 0, end: frac),
           duration: const Duration(milliseconds: 700),
           curve: Curves.easeOutCubic,
-          builder: (_, v, __) => Container(
+          builder: (_, v, _) => Container(
             width: 26,
             height: (96 * v) < 4 ? 4 : 96 * v,
             decoration: decoration,
@@ -2761,7 +2761,7 @@ class _LocationChartRowState extends State<_LocationChartRow> {
                   ),
                   duration: const Duration(milliseconds: 650),
                   curve: Curves.easeOutCubic,
-                  builder: (_, progress, __) => FractionallySizedBox(
+                  builder: (_, progress, _) => FractionallySizedBox(
                     widthFactor: progress.clamp(0.0, 1.0),
                     child: Container(color: widget.color),
                   ),

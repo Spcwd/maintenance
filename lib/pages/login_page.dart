@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/account_repository.dart';
-import 'admin_page.dart';
 import 'home_page.dart';
 
 class LoginPage extends StatefulWidget {
