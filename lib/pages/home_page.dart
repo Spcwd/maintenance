@@ -116,6 +116,8 @@ class _HomePageState extends State<HomePage> {
   String _search = '';
   bool _loading = true;
   bool _showAllTypes = false;
+  bool _showAllPendingLocations = false;
+  bool _showAllCompletedLocations = false;
   String? _error;
 
   List<MaintenanceRequest> _requests = [];
@@ -1578,6 +1580,86 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  Widget _locationPanel({required String status}) {
+    final counts = <String, int>{};
+    final labels = <String, String>{};
+    for (final request in _requests) {
+      if (request.status != status) continue;
+      final label = request.location.trim().replaceAll(RegExp(r'\s+'), ' ');
+      if (label.isEmpty) continue;
+
+      final key = label.toLowerCase();
+      labels.putIfAbsent(key, () => label);
+      counts.update(key, (count) => count + 1, ifAbsent: () => 1);
+    }
+
+    final entries = counts.entries.toList()
+      ..sort((a, b) {
+        final byCount = b.value.compareTo(a.value);
+        if (byCount != 0) return byCount;
+        return labels[a.key]!.toLowerCase().compareTo(
+              labels[b.key]!.toLowerCase(),
+            );
+      });
+    final max = entries.fold<int>(
+      0,
+      (largest, entry) => entry.value > largest ? entry.value : largest,
+    );
+    final showAll = status == 'Pending'
+        ? _showAllPendingLocations
+        : _showAllCompletedLocations;
+    final shownEntries = showAll ? entries : entries.take(5).toList();
+    final color = statusColor(status);
+
+    return _panel(
+      icon: Icons.location_on_rounded,
+      title: '$status by location',
+      subtitle: '$status requests grouped by site',
+      trailing: _chip(
+        '${entries.length} ${entries.length == 1 ? 'location' : 'locations'}',
+        color,
+      ),
+      child: entries.isEmpty
+          ? const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Text(
+                'Location totals will appear here when requests are added.',
+                style: TextStyle(color: _muted),
+              ),
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (final entry in shownEntries)
+                  _LocationChartRow(
+                    key: ValueKey(entry.key),
+                    label: labels[entry.key]!,
+                    count: entry.value,
+                    max: max,
+                    color: color,
+                  ),
+                if (entries.length > 5)
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: () => setState(() {
+                        if (status == 'Pending') {
+                          _showAllPendingLocations = !_showAllPendingLocations;
+                        } else {
+                          _showAllCompletedLocations =
+                              !_showAllCompletedLocations;
+                        }
+                      }),
+                      child: Text(
+                        showAll ? 'View less' : 'View more',
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+    );
+  }
+
   Widget _typePanel() {
     final counts = <String, int>{};
     final labels = <String, String>{};
@@ -1827,6 +1909,12 @@ class _HomePageState extends State<HomePage> {
           _statsGrid(w),
           const SizedBox(height: 24),
           _pairRow(twoCol, _statusPanel(inner), _weekPanel()),
+          const SizedBox(height: 20),
+          _pairRow(
+            twoCol,
+            _locationPanel(status: 'Pending'),
+            _locationPanel(status: 'Completed'),
+          ),
           const SizedBox(height: 20),
           _pairRow(twoCol, _typePanel(), _priorityPanel()),
           const SizedBox(height: 20),
@@ -2258,7 +2346,7 @@ class _HomePageState extends State<HomePage> {
 
   Widget _content(bool wide) {
     final sw = MediaQuery.of(context).size.width;
-    final hPad = wide ? 32.0 : (sw < 400 ? 12.0 : 16.0);
+    final hPad = wide ? 20.0 : (sw < 400 ? 12.0 : 16.0);
 
     return Column(
       children: [
@@ -2269,7 +2357,7 @@ class _HomePageState extends State<HomePage> {
             padding: EdgeInsets.fromLTRB(hPad, wide ? 28 : 8, hPad, 100),
             child: Center(
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1280),
+                constraints: const BoxConstraints(maxWidth: 1600),
                 child: LayoutBuilder(
                   builder: (context, c) {
                     final w = c.maxWidth;
@@ -2589,6 +2677,100 @@ class _HomePageState extends State<HomePage> {
               label: const Text('New Request',
                   style: TextStyle(fontWeight: FontWeight.w700)),
             ),
+    );
+  }
+}
+
+class _LocationChartRow extends StatefulWidget {
+  final String label;
+  final int count;
+  final int max;
+  final Color color;
+
+  const _LocationChartRow({
+    super.key,
+    required this.label,
+    required this.count,
+    required this.max,
+    required this.color,
+  });
+
+  @override
+  State<_LocationChartRow> createState() => _LocationChartRowState();
+}
+
+class _LocationChartRowState extends State<_LocationChartRow> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        transform: Matrix4.translationValues(0, _hover ? -2 : 0, 0),
+        margin: const EdgeInsets.only(bottom: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        decoration: BoxDecoration(
+          color: _hover ? const Color(0xFFF5FAF8) : Colors.transparent,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: _hover ? const Color(0xFFD5E9E2) : Colors.transparent,
+          ),
+        ),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    widget.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFF172B3A),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13.5,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '${widget.count}',
+                  style: TextStyle(
+                    color: widget.color,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                height: 10,
+                color: const Color(0xFFEFF3F1),
+                alignment: Alignment.centerLeft,
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween<double>(
+                    begin: 0,
+                    end: widget.max == 0 ? 0 : widget.count / widget.max,
+                  ),
+                  duration: const Duration(milliseconds: 650),
+                  curve: Curves.easeOutCubic,
+                  builder: (_, progress, __) => FractionallySizedBox(
+                    widthFactor: progress.clamp(0.0, 1.0),
+                    child: Container(color: widget.color),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
